@@ -244,9 +244,43 @@ async function getServiceAccountToken() {
   return (await r.json()).access_token;
 }
 
+async function getOrCreateDateFolder(dateStr) {
+  // dateStr format: 2026-05-18
+  // Check if folder already exists inside the root delivery folder
+  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=` +
+    encodeURIComponent(`name='${dateStr}' and mimeType='application/vnd.google-apps.folder' and '${CONFIG.driveFolderId}' in parents and trashed=false`) +
+    `&fields=files(id)`;
+  const searchResp = await fetch(searchUrl, {
+    headers: { Authorization: `Bearer ${oauthToken}` }
+  });
+  const searchData = await searchResp.json();
+
+  if (searchData.files && searchData.files.length > 0) {
+    // Folder already exists — return its ID
+    return searchData.files[0].id;
+  }
+
+  // Create the date folder inside the root delivery folder
+  const createResp = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${oauthToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: dateStr,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [CONFIG.driveFolderId],
+    }),
+  });
+  const createData = await createResp.json();
+  return createData.id;
+}
+
 async function uploadToDrive(b64, mime, filename) {
+  // Get or create today's date folder
+  const today = new Date().toISOString().slice(0, 10);
+  const folderId = await getOrCreateDateFolder(today);
+
   const bnd = 'wh_bnd';
-  const meta = JSON.stringify({ name: filename, parents: [CONFIG.driveFolderId] });
+  const meta = JSON.stringify({ name: filename, parents: [folderId] });
   const body = `--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: ${mime}\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n--${bnd}--`;
   const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
     method:'POST',
