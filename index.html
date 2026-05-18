@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Warehouse Delivery Intake</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; min-height: 100vh; }
+  .app { max-width: 480px; margin: 0 auto; padding: 1rem; padding-bottom: 3rem; }
+
+  .header { text-align: center; padding: 1.5rem 0 1.25rem; margin-bottom: 1.25rem; border-bottom: 1px solid #e5e5e2; }
+  .header h1 { font-size: 20px; font-weight: 600; color: #1a1a18; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .header p { font-size: 13px; color: #888; margin-top: 5px; }
+
+  .config-warn { background: #fffbeb; border: 1px solid #f6d860; border-radius: 12px; padding: 12px 14px; margin-bottom: 1rem; font-size: 13px; color: #92600a; display: none; align-items: flex-start; gap: 8px; }
+  .config-warn.visible { display: flex; }
+
+  .upload-zone { border: 2px dashed #d0d0cc; border-radius: 14px; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 1rem; background: #fff; }
+  .upload-zone:hover, .upload-zone.drag { background: #f8f8f5; border-color: #aaa; }
+  .upload-zone svg { width: 40px; height: 40px; color: #aaa; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+  .upload-zone p { font-size: 15px; color: #555; font-weight: 500; }
+  .upload-zone .hint { font-size: 12px; color: #aaa; margin-top: 4px; }
+  #file-input { display: none; }
+
+  .preview-wrap { position: relative; margin-bottom: 1rem; }
+  .preview-wrap img { width: 100%; border-radius: 14px; border: 1px solid #e8e8e5; display: block; max-height: 280px; object-fit: cover; }
+  .remove-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.92); border: 1px solid #ddd; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #555; }
+
+  .card { background: #fff; border-radius: 16px; border: 1px solid #e8e8e5; padding: 1.25rem; margin-bottom: 1rem; }
+  .section-label { font-size: 11px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 14px; }
+
+  .count-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .count-label { font-size: 14px; color: #555; font-weight: 500; }
+  .count-ctrl { display: flex; align-items: center; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; }
+  .count-ctrl button { background: #fff; border: none; width: 44px; height: 44px; font-size: 24px; cursor: pointer; color: #333; display: flex; align-items: center; justify-content: center; transition: background 0.1s; }
+  .count-ctrl button:hover { background: #f5f5f3; }
+  .count-ctrl button:active { background: #ececea; }
+  .count-val { font-size: 22px; font-weight: 600; min-width: 54px; text-align: center; color: #1a1a18; border-left: 1px solid #eee; border-right: 1px solid #eee; line-height: 44px; }
+  .count-hint { font-size: 12px; color: #bbb; margin-bottom: 14px; margin-top: 4px; }
+
+  .field-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-top: 1px solid #f0f0ee; gap: 12px; }
+  .flabel { font-size: 13px; color: #888; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .flabel svg { width: 14px; height: 14px; }
+  .fvalue { font-size: 13px; color: #1a1a18; text-align: right; flex: 1; }
+  .fvalue input { font-size: 13px; color: #1a1a18; background: transparent; border: none; border-bottom: 1px solid #ddd; text-align: right; outline: none; width: 100%; font-family: inherit; padding-bottom: 2px; }
+  .fvalue input:focus { border-bottom-color: #3b82f6; }
+
+  .progress-bar { height: 3px; background: #eee; border-radius: 99px; margin-bottom: 1rem; overflow: hidden; display: none; }
+  .progress-bar .fill { height: 100%; width: 0; background: #3b82f6; border-radius: 99px; transition: width 0.3s ease; }
+
+  .action-row { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+  .action-row button { flex: 1; padding: 13px; font-size: 14px; font-weight: 500; border-radius: 12px; cursor: pointer; border: 1px solid #ddd; background: #fff; color: #1a1a18; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.12s; }
+  .action-row button:hover { background: #f5f5f3; }
+  .action-row .primary-btn { background: #1a1a18; color: #fff; border-color: #1a1a18; }
+  .action-row .primary-btn:hover { background: #333; }
+
+  .log-section { margin-top: 0.5rem; }
+  .log-entry { background: #fff; border: 1px solid #e8e8e5; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+  .log-thumb { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; flex-shrink: 0; border: 1px solid #eee; }
+  .log-info { flex: 1; min-width: 0; }
+  .log-top { display: flex; justify-content: space-between; align-items: center; }
+  .log-count { font-size: 14px; font-weight: 600; color: #1a1a18; }
+  .log-time { font-size: 12px; color: #aaa; }
+  .log-sub { font-size: 12px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .log-status { font-size: 11px; margin-top: 3px; }
+  .log-status.saving { color: #f59e0b; }
+  .log-status.saved { color: #22c55e; }
+  .log-status.error { color: #ef4444; }
+  .log-status.local { color: #aaa; }
+
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: #1a1a18; color: #fff; border-radius: 12px; padding: 10px 18px; font-size: 13px; display: none; align-items: center; gap: 8px; white-space: nowrap; z-index: 99; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+      Delivery Intake
+    </h1>
+    <p>Photo + count — done in seconds</p>
+  </div>
+
+  <div class="config-warn" id="config-warn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0;margin-top:1px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Google credentials not set — entries will log locally only. Open this file in a text editor and fill in your credentials at the top of the &lt;script&gt; section.</span>
+  </div>
+
+  <div class="upload-zone" id="upload-zone">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    <p>Tap to photograph the delivery</p>
+    <p class="hint">whole pile is fine</p>
+    <input type="file" id="file-input" accept="image/*" capture="environment">
+  </div>
+
+  <div class="preview-wrap" id="preview-wrap" style="display:none;">
+    <img id="preview-img" src="" alt="Delivery photo">
+    <button class="remove-btn" id="remove-btn" aria-label="Remove photo">✕</button>
+  </div>
+
+  <div id="form-section" style="display:none;">
+    <div class="card">
+      <div class="section-label">Delivery details</div>
+
+      <div class="count-row">
+        <span class="count-label">Pieces</span>
+        <div class="count-ctrl">
+          <button id="count-down" aria-label="decrease">−</button>
+          <span class="count-val" id="count-display">1</span>
+          <button id="count-up" aria-label="increase">+</button>
+        </div>
+      </div>
+      <p class="count-hint">How many packages in this delivery?</p>
+
+      <div class="field-row">
+        <span class="flabel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Received
+        </span>
+        <span class="fvalue" id="field-date">—</span>
+      </div>
+      <div class="field-row">
+        <span class="flabel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Logged by
+        </span>
+        <span class="fvalue"><input id="field-name" type="text" placeholder="Your name"></span>
+      </div>
+      <div class="field-row">
+        <span class="flabel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Notes
+        </span>
+        <span class="fvalue"><input id="field-notes" type="text" placeholder="e.g. left at dock 3"></span>
+      </div>
+    </div>
+
+    <div class="progress-bar" id="progress-bar"><div class="fill" id="progress-fill"></div></div>
+
+    <div class="action-row">
+      <button id="discard-btn">✕ Cancel</button>
+      <button class="primary-btn" id="log-btn">✓ Log delivery</button>
+    </div>
+  </div>
+
+  <div class="log-section" id="log-section" style="display:none;">
+    <div class="section-label" style="margin-bottom:10px;">Logged today</div>
+    <div id="log-entries"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast">
+  <span>✓</span>
+  <span id="toast-msg">Delivery logged!</span>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  PASTE YOUR CREDENTIALS HERE
+// ─────────────────────────────────────────────
+const CONFIG = {
+  serviceAccount: {
+    "client_email": "warehouse-intake@warehouse-intake-2026.iam.gserviceaccount.com",
+    "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCzR6CpIiNrJx9A\nNLzIbIs5BiP+x77evN8P0YZMkNP0FEPyn9pV3xe2hfFLYO8s7SH90fcOjgciC+rV\npqaorbHSjPou7UBbUeZzVgJPkpdN1/C1bMz9qHXUtGQjczgXa8i1lylhESW+wAAn\nBvHf8j3h+XJgqRZ9H7Ol/yu46eRZtVZZ2aQqcCo7D0pjqSGMAAzdv3uTS7QLv3Ii\nwQmlGnz6lzNaMkqwGqomVXJEhWnNg1fj5W7WYiFSXpR5dGyCy0rDFNMO26tmEgWD\n6i2zzwwOJwZxkWtBHJ3E/jtyKudRFctDKhBdFXp2UFmhvhad798L6Jzuy6lwBhKv\nd9xkXnktAgMBAAECggEAJzKc/P3a0p3OJmKheAzLb99Y1Wbk45xWBQZhn7H2taIM\nrSqoOSg67gxhEoMSKDd8vBtBMix5gMcsRCRYwf6gJ5HtTX9QF+dTRJpkjPNXI4z4\nMyKjuz4u7R+32Uxi0jQdwR5YzMFMCGXAYsgQ8E7tms/IYzv1D8xzofKlo5t38ujm\nMwogKSkhjiofnoeJq69wknerRaEipLOwao6qIgjT/VQDlOLOnPDBepbrjdKU/iZz\nZn7VYmG9C7qm7O7tLOSoNyYQui7AX+oWdp6mctACW1b6hT7WqshUNQDT8+aVKBA6\nYif9V3efHeb1dozrODANZsr4ERCa47bheSzjLzdlHQKBgQDiTKQaYXngGOZVWdD1\noxa3i6Y5p5sfeuRvMJNBqb5Vmz+BNAvPqdtMXc4rn3UslHIfJx//0OeUn+TMdda3\nmacDrUbMpXEjIqkBMsSik/wDQiPUB2Hy4Y4uxsy2ZNC86bk3UqG5ODWlb62Vsnvm\npVGFiC9+kIRA43Cuk3wZMnkbKwKBgQDKzzDfJJvW+46+LbddwGhWThMUoBeN55/E\nJKFutiX3WJ/7mO564tAbrGaB5ICwsd5LSHpmMRreyFAtiQ8QTD8lYDF3+wzVbpVx\nST93MhM5MHddAMU5NNJAqStNnoVK9jE+xCEVrONJpRrMspjb21Tf7BbBkoZMDCHQ\nO4cy+tKxBwKBgFQyr9wg6He4y/p1sIm0ZH9mNjK9aboMv3GfYSrNPUQcv0QTWVGq\noS2IuW0Bp1cu5EczB3TnBUMHOtnX/kvRn5J+phj+dVndS4Rmn0LeTKXptert1EPK\nKFy/GuvCFugzDfbHh+SiRVOIec142yC14d8NDJ7Kpmp+NS6/MS0u2mCBAoGAYVox\nqHunPvxEGfBR+/PXYc5ahGUQyXJtE7dNsppHAUOOkDRqDZ0ArrgEAMgSKj9HaLXi\n41kg/94B9sm67GTdTvCs7l4ZW/6YR+gUSgBEkAg+0+sBwSMk5hsOiVTVwRUKsIlv\nJDt4YyqZAbedfrP7Ov3WMpdGVgzg0lcw3/zc1FMCgYAdQpXAyB3evmyU8XozBBRe\nvWhbov2cAf0tEubUm6mkipbjvudjDqlOLEpc3C5g1LqXr/p8pw4zKAMb/ZTuJwWA\nrkRnVhXCiOzGosJkeK54pA5PDCut7y/VUC2CXYwY+ZGtUDurE9R8EzW03NbxgZv6\nTP5DDDrAkYRFp/pdXMcArg==\n-----END PRIVATE KEY-----\n",
+    "token_uri": "https://oauth2.googleapis.com/token",
+  },
+
+  // Paste your Sheet ID here (from the URL of your Google Sheet):
+  sheetId: '12rGsQHmVPzfHlwJ61upI9YkDgatBWc_ev1XC07_5NrU',
+
+  // Paste your Drive folder ID here (from the URL of your Drive folder):
+  driveFolderId: '16vvOdzKqtg_l8cm_IGeZAMUzb0miPN7I',
+};
+// ─────────────────────────────────────────────
+
+const isConfigured = !!(
+  CONFIG.serviceAccount.client_email &&
+  CONFIG.sheetId !== 'YOUR_SHEET_ID_HERE' &&
+  CONFIG.driveFolderId !== 'YOUR_DRIVE_FOLDER_ID_HERE'
+);
+
+if (!isConfigured) document.getElementById('config-warn').classList.add('visible');
+
+async function getGoogleToken() {
+  const sa = CONFIG.serviceAccount;
+  const now = Math.floor(Date.now() / 1000);
+  const b64url = o => btoa(JSON.stringify(o)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const sigInput = b64url({ alg:'RS256', typ:'JWT' }) + '.' + b64url({
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets',
+    aud: sa.token_uri || 'https://oauth2.googleapis.com/token',
+    exp: now + 3600, iat: now,
+  });
+  const pem = sa.private_key.replace(/\\n/g,'\n');
+  const keyDer = Uint8Array.from(atob(pem.replace(/-----[^-]+-----|[\n]/g,'')), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('pkcs8', keyDer, { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(sigInput));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const jwt = sigInput + '.' + sigB64;
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:`grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  });
+  return (await r.json()).access_token;
+}
+
+async function uploadToDrive(token, b64, mime, filename) {
+  const bnd = 'wh_bnd';
+  const meta = JSON.stringify({ name: filename, parents: [CONFIG.driveFolderId] });
+  const body = `--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: ${mime}\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n--${bnd}--`;
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+    method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':`multipart/related; boundary=${bnd}` }, body,
+  });
+  return await r.json();
+}
+
+async function appendToSheet(token, row) {
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.sheetId}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED`, {
+    method:'POST', headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ values: [row] }),
+  });
+}
+
+// UI
+const zone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const previewWrap = document.getElementById('preview-wrap');
+const previewImg = document.getElementById('preview-img');
+const formSection = document.getElementById('form-section');
+const countDisplay = document.getElementById('count-display');
+const progressBar = document.getElementById('progress-bar');
+const progressFill = document.getElementById('progress-fill');
+const logSection = document.getElementById('log-section');
+const logEntries = document.getElementById('log-entries');
+const toast = document.getElementById('toast');
+
+let b64 = null, mime = 'image/jpeg', thumb = null, count = 1;
+let sessionLog = [];
+
+const savedName = localStorage.getItem('wh_name') || '';
+if (savedName) document.getElementById('field-name').value = savedName;
+
+zone.addEventListener('click', () => fileInput.click());
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f?.type.startsWith('image/')) loadFile(f); });
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  mime = file.type || 'image/jpeg';
+  new Promise(res => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(file); }).then(dataUrl => {
+    b64 = dataUrl.split(',')[1];
+    thumb = dataUrl;
+    previewImg.src = dataUrl;
+    zone.style.display = 'none';
+    previewWrap.style.display = 'block';
+    count = 1; countDisplay.textContent = 1;
+    document.getElementById('field-date').textContent = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+    formSection.style.display = 'block';
+  });
+}
+
+function resetAll() {
+  b64 = null; thumb = null;
+  previewImg.src = '';
+  previewWrap.style.display = 'none';
+  formSection.style.display = 'none';
+  zone.style.display = 'block';
+  fileInput.value = '';
+  document.getElementById('field-notes').value = '';
+}
+
+document.getElementById('remove-btn').addEventListener('click', resetAll);
+document.getElementById('discard-btn').addEventListener('click', resetAll);
+document.getElementById('count-down').addEventListener('click', () => { if (count > 0) countDisplay.textContent = --count; });
+document.getElementById('count-up').addEventListener('click', () => countDisplay.textContent = ++count);
+
+document.getElementById('log-btn').addEventListener('click', async () => {
+  const finalCount = parseInt(countDisplay.textContent) || 0;
+  const name = document.getElementById('field-name').value.trim() || 'Unknown';
+  const notes = document.getElementById('field-notes').value.trim();
+  const dateStr = document.getElementById('field-date').textContent;
+  const snapB64 = b64, snapMime = mime, snapThumb = thumb;
+
+  if (name !== 'Unknown') localStorage.setItem('wh_name', name);
+
+  const id = Date.now();
+  sessionLog.push({ id, count: finalCount, name, notes, dateStr, thumb: snapThumb, status: 'saving' });
+  renderLog();
+  resetAll();
+  showToast(`${finalCount} piece${finalCount !== 1 ? 's' : ''} logged!`);
+
+  if (isConfigured && snapB64) {
+    progressBar.style.display = 'block';
+    let w = 0;
+    const tick = setInterval(() => { w = Math.min(w+10, 85); progressFill.style.width = w+'%'; }, 300);
+    try {
+      const token = await getGoogleToken();
+      const now = new Date();
+      const filename = `PKG_${now.toISOString().slice(0,10)}_${now.toTimeString().slice(0,8).replace(/:/g,'')}.jpg`;
+      const driveFile = await uploadToDrive(token, snapB64, snapMime, filename);
+      await appendToSheet(token, [dateStr, finalCount, name, notes, driveFile.webViewLink || '']);
+      clearInterval(tick); progressFill.style.width = '100%';
+      setTimeout(() => { progressBar.style.display = 'none'; progressFill.style.width = '0'; }, 500);
+      setStatus(id, 'saved');
+    } catch(e) {
+      clearInterval(tick); progressBar.style.display = 'none'; progressFill.style.width = '0';
+      console.error(e); setStatus(id, 'error');
+    }
+  } else {
+    setStatus(id, 'local');
+  }
+});
+
+function setStatus(id, status) {
+  const e = sessionLog.find(e => e.id === id);
+  if (e) { e.status = status; renderLog(); }
+}
+
+function renderLog() {
+  logSection.style.display = 'block';
+  const statusMap = {
+    saving: ['saving', '↻ Saving to Drive & Sheets...'],
+    saved:  ['saved',  '✓ Saved to Google Drive & Sheets'],
+    error:  ['error',  '✕ Sync failed — logged locally only'],
+    local:  ['local',  '— Local only (credentials not configured)'],
+  };
+  logEntries.innerHTML = sessionLog.slice().reverse().map(e => {
+    const [cls, label] = statusMap[e.status] || ['local',''];
+    const time = e.dateStr.split(',').slice(1).join(',').trim();
+    return `<div class="log-entry">
+      ${e.thumb ? `<img class="log-thumb" src="${e.thumb}" alt="delivery">` : ''}
+      <div class="log-info">
+        <div class="log-top">
+          <span class="log-count">${e.count} piece${e.count!==1?'s':''}</span>
+          <span class="log-time">${time}</span>
+        </div>
+        <div class="log-sub">By ${e.name}${e.notes?' · '+e.notes:''}</div>
+        <div class="log-status ${cls}">${label}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showToast(msg) {
+  document.getElementById('toast-msg').textContent = msg;
+  toast.style.display = 'flex';
+  setTimeout(() => toast.style.display = 'none', 3000);
+}
+</script>
+</body>
+</html>
