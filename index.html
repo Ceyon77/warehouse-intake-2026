@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Warehouse Delivery Intake</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; min-height: 100vh; }
@@ -18,8 +17,9 @@
   .auth-banner.hidden { display: none; }
   .auth-banner button { background: #1a1a18; color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .auth-banner button:hover { background: #333; }
-  .auth-ok { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem; font-size: 13px; color: #15803d; display: none; align-items: center; gap: 8px; }
+  .auth-ok { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 10px 14px; margin-bottom: 1rem; font-size: 13px; color: #15803d; display: none; align-items: center; justify-content: space-between; gap: 8px; }
   .auth-ok.visible { display: flex; }
+  .auth-ok .signout { font-size: 12px; color: #888; cursor: pointer; text-decoration: underline; background: none; border: none; }
 
   .upload-zone { border: 2px dashed #d0d0cc; border-radius: 14px; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 1rem; background: #fff; }
   .upload-zone:hover, .upload-zone.drag { background: #f8f8f5; border-color: #aaa; }
@@ -90,14 +90,13 @@
     <p>Photo + count — done in seconds</p>
   </div>
 
-  <!-- Google sign-in banner -->
   <div class="auth-banner" id="auth-banner">
-    <span>Sign in with Google to save photos to Drive</span>
-    <button onclick="signInWithGoogle()">Sign in</button>
+    <span>Sign in once to enable photo storage</span>
+    <button onclick="startOAuth()">Sign in with Google</button>
   </div>
   <div class="auth-ok" id="auth-ok">
-    <span>✓</span>
-    <span id="auth-name">Signed in — photos will save to Drive</span>
+    <span>✓ Google Drive connected</span>
+    <button class="signout" onclick="signOut()">Sign out</button>
   </div>
 
   <div class="upload-zone" id="upload-zone">
@@ -148,7 +147,7 @@
     </div>
 
     <div class="progress-wrap" id="progress-wrap">
-      <div class="progress-label" id="progress-label">Uploading photo...</div>
+      <div class="progress-label" id="progress-label">Saving...</div>
       <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
     </div>
 
@@ -175,10 +174,17 @@
 //  CREDENTIALS — fill these in
 // ─────────────────────────────────────────────
 const CONFIG = {
-  // OAuth Client ID (for photo upload to Drive as your real Google account)
+  // OAuth Client ID — already set
   oauthClientId: '599146637467-6r7ttfmvufshfn7egce5cisj3pmc2cln.apps.googleusercontent.com',
 
-  // Service account (for logging to Google Sheets)
+  // OAuth Client Secret — get this from Google Cloud Console:
+  // APIs & Services → Credentials → click your OAuth client → copy Client Secret
+  oauthClientSecret: "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",
+
+  // Your GitHub Pages URL (must match what you added in Google Cloud Console)
+  redirectUri: 'https://ceyon77.github.io/warehouse-intake/',
+
+  // Service account for Sheets logging
   serviceAccount: {
     "client_email": "warehouse-intake@warehouse-intake-2026.iam.gserviceaccount.com",
     "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCzR6CpIiNrJx9A\nNLzIbIs5BiP+x77evN8P0YZMkNP0FEPyn9pV3xe2hfFLYO8s7SH90fcOjgciC+rV\npqaorbHSjPou7UBbUeZzVgJPkpdN1/C1bMz9qHXUtGQjczgXa8i1lylhESW+wAAn\nBvHf8j3h+XJgqRZ9H7Ol/yu46eRZtVZZ2aQqcCo7D0pjqSGMAAzdv3uTS7QLv3Ii\nwQmlGnz6lzNaMkqwGqomVXJEhWnNg1fj5W7WYiFSXpR5dGyCy0rDFNMO26tmEgWD\n6i2zzwwOJwZxkWtBHJ3E/jtyKudRFctDKhBdFXp2UFmhvhad798L6Jzuy6lwBhKv\nd9xkXnktAgMBAAECggEAJzKc/P3a0p3OJmKheAzLb99Y1Wbk45xWBQZhn7H2taIM\nrSqoOSg67gxhEoMSKDd8vBtBMix5gMcsRCRYwf6gJ5HtTX9QF+dTRJpkjPNXI4z4\nMyKjuz4u7R+32Uxi0jQdwR5YzMFMCGXAYsgQ8E7tms/IYzv1D8xzofKlo5t38ujm\nMwogKSkhjiofnoeJq69wknerRaEipLOwao6qIgjT/VQDlOLOnPDBepbrjdKU/iZz\nZn7VYmG9C7qm7O7tLOSoNyYQui7AX+oWdp6mctACW1b6hT7WqshUNQDT8+aVKBA6\nYif9V3efHeb1dozrODANZsr4ERCa47bheSzjLzdlHQKBgQDiTKQaYXngGOZVWdD1\noxa3i6Y5p5sfeuRvMJNBqb5Vmz+BNAvPqdtMXc4rn3UslHIfJx//0OeUn+TMdda3\nmacDrUbMpXEjIqkBMsSik/wDQiPUB2Hy4Y4uxsy2ZNC86bk3UqG5ODWlb62Vsnvm\npVGFiC9+kIRA43Cuk3wZMnkbKwKBgQDKzzDfJJvW+46+LbddwGhWThMUoBeN55/E\nJKFutiX3WJ/7mO564tAbrGaB5ICwsd5LSHpmMRreyFAtiQ8QTD8lYDF3+wzVbpVx\nST93MhM5MHddAMU5NNJAqStNnoVK9jE+xCEVrONJpRrMspjb21Tf7BbBkoZMDCHQ\nO4cy+tKxBwKBgFQyr9wg6He4y/p1sIm0ZH9mNjK9aboMv3GfYSrNPUQcv0QTWVGq\noS2IuW0Bp1cu5EczB3TnBUMHOtnX/kvRn5J+phj+dVndS4Rmn0LeTKXptert1EPK\nKFy/GuvCFugzDfbHh+SiRVOIec142yC14d8NDJ7Kpmp+NS6/MS0u2mCBAoGAYVox\nqHunPvxEGfBR+/PXYc5ahGUQyXJtE7dNsppHAUOOkDRqDZ0ArrgEAMgSKj9HaLXi\n41kg/94B9sm67GTdTvCs7l4ZW/6YR+gUSgBEkAg+0+sBwSMk5hsOiVTVwRUKsIlv\nJDt4YyqZAbedfrP7Ov3WMpdGVgzg0lcw3/zc1FMCgYAdQpXAyB3evmyU8XozBBRe\nvWhbov2cAf0tEubUm6mkipbjvudjDqlOLEpc3C5g1LqXr/p8pw4zKAMb/ZTuJwWA\nrkRnVhXCiOzGosJkeK54pA5PDCut7y/VUC2CXYwY+ZGtUDurE9R8EzW03NbxgZv6\nTP5DDDrAkYRFp/pdXMcArg==\n-----END PRIVATE KEY-----\n",
@@ -188,37 +194,153 @@ const CONFIG = {
   // Google Sheet ID
   sheetId: '12rGsQHmVPzfHlwJ61upI9YkDgatBWc_ev1XC07_5NrU',
 
-  // Google Drive folder ID (photos will upload here under YOUR account)
+  // Google Drive folder ID
   driveFolderId: '16vvOdzKqtg_l8cm_IGeZAMUzb0miPN7I',
 };
 // ─────────────────────────────────────────────
 
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const LS_REFRESH = 'wh_refresh_token';
+const LS_ACCESS  = 'wh_access_token';
+const LS_EXPIRY  = 'wh_token_expiry';
+
+let oauthAccessToken = null;
 const sheetsConfigured = !!(CONFIG.serviceAccount && CONFIG.serviceAccount.client_email);
 
-// ── OAuth (Google Identity Services) ──
-let oauthToken = null;
+// ── OAuth: persistent refresh token flow ──
 
-function signInWithGoogle() {
-  google.accounts.oauth2.initTokenClient({
-    client_id: CONFIG.oauthClientId,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    callback: (resp) => {
-      if (resp.access_token) {
-        oauthToken = resp.access_token;
-        document.getElementById('auth-banner').classList.add('hidden');
-        document.getElementById('auth-ok').classList.add('visible');
-        document.getElementById('auth-name').textContent = 'Signed in — photos will save to Drive';
-      }
-    },
-  }).requestAccessToken();
+function startOAuth() {
+  const state = Math.random().toString(36).slice(2);
+  localStorage.setItem('wh_oauth_state', state);
+  const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  url.searchParams.set('client_id', CONFIG.oauthClientId);
+  url.searchParams.set('redirect_uri', CONFIG.redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', SCOPES);
+  url.searchParams.set('access_type', 'offline');   // requests refresh token
+  url.searchParams.set('prompt', 'consent');         // forces refresh token every time
+  url.searchParams.set('state', state);
+  window.location.href = url.toString();
 }
 
-// Auto-prompt sign in on load
-window.addEventListener('load', () => {
-  if (window.google) {
-    // Show banner — user clicks to sign in
+async function handleOAuthCallback(code) {
+  // Exchange auth code for tokens
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code,
+      client_id: CONFIG.oauthClientId,
+      client_secret: CONFIG.oauthClientSecret,
+      redirect_uri: CONFIG.redirectUri,
+      grant_type: 'authorization_code',
+    }),
+  });
+  const data = await resp.json();
+  if (data.refresh_token) {
+    localStorage.setItem(LS_REFRESH, data.refresh_token);
   }
-});
+  if (data.access_token) {
+    oauthAccessToken = data.access_token;
+    localStorage.setItem(LS_ACCESS, data.access_token);
+    localStorage.setItem(LS_EXPIRY, Date.now() + (data.expires_in - 60) * 1000);
+  }
+  // Clean URL
+  window.history.replaceState({}, '', CONFIG.redirectUri);
+  showAuthOk();
+}
+
+async function getOAuthToken() {
+  // Use cached access token if still valid
+  const expiry = parseInt(localStorage.getItem(LS_EXPIRY) || '0');
+  if (oauthAccessToken && Date.now() < expiry) return oauthAccessToken;
+
+  // Try to refresh using stored refresh token
+  const refreshToken = localStorage.getItem(LS_REFRESH);
+  if (!refreshToken) return null;
+
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: CONFIG.oauthClientId,
+      client_secret: CONFIG.oauthClientSecret,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await resp.json();
+  if (data.access_token) {
+    oauthAccessToken = data.access_token;
+    localStorage.setItem(LS_ACCESS, data.access_token);
+    localStorage.setItem(LS_EXPIRY, Date.now() + (data.expires_in - 60) * 1000);
+    return oauthAccessToken;
+  }
+  return null;
+}
+
+function signOut() {
+  localStorage.removeItem(LS_REFRESH);
+  localStorage.removeItem(LS_ACCESS);
+  localStorage.removeItem(LS_EXPIRY);
+  oauthAccessToken = null;
+  document.getElementById('auth-ok').classList.remove('visible');
+  document.getElementById('auth-banner').classList.remove('hidden');
+}
+
+function showAuthOk() {
+  document.getElementById('auth-banner').classList.add('hidden');
+  document.getElementById('auth-ok').classList.add('visible');
+}
+
+// ── On page load: handle OAuth callback or restore session ──
+(async () => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+
+  if (code && state && state === localStorage.getItem('wh_oauth_state')) {
+    // Returning from Google sign-in
+    await handleOAuthCallback(code);
+  } else if (localStorage.getItem(LS_REFRESH)) {
+    // Already signed in — silently refresh token
+    const token = await getOAuthToken();
+    if (token) showAuthOk();
+  }
+})();
+
+// ── Google Drive upload ──
+async function getOrCreateDateFolder(token) {
+  const today = new Date().toISOString().slice(0, 10);
+  const q = encodeURIComponent(`name='${today}' and mimeType='application/vnd.google-apps.folder' and '${CONFIG.driveFolderId}' in parents and trashed=false`);
+  const searchResp = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const searchData = await searchResp.json();
+  if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
+
+  const createResp = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: today, mimeType: 'application/vnd.google-apps.folder', parents: [CONFIG.driveFolderId] }),
+  });
+  return (await createResp.json()).id;
+}
+
+async function uploadToDrive(b64, mime, filename) {
+  const token = await getOAuthToken();
+  if (!token) return null;
+  const folderId = await getOrCreateDateFolder(token);
+  const bnd = 'wh_bnd';
+  const meta = JSON.stringify({ name: filename, parents: [folderId] });
+  const body = `--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: ${mime}\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n--${bnd}--`;
+  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${bnd}` },
+    body,
+  });
+  return await r.json();
+}
 
 // ── Google Sheets via service account ──
 async function getServiceAccountToken() {
@@ -244,53 +366,8 @@ async function getServiceAccountToken() {
   return (await r.json()).access_token;
 }
 
-async function getOrCreateDateFolder(dateStr) {
-  // dateStr format: 2026-05-18
-  // Check if folder already exists inside the root delivery folder
-  const searchUrl = `https://www.googleapis.com/drive/v3/files?q=` +
-    encodeURIComponent(`name='${dateStr}' and mimeType='application/vnd.google-apps.folder' and '${CONFIG.driveFolderId}' in parents and trashed=false`) +
-    `&fields=files(id)`;
-  const searchResp = await fetch(searchUrl, {
-    headers: { Authorization: `Bearer ${oauthToken}` }
-  });
-  const searchData = await searchResp.json();
-
-  if (searchData.files && searchData.files.length > 0) {
-    // Folder already exists — return its ID
-    return searchData.files[0].id;
-  }
-
-  // Create the date folder inside the root delivery folder
-  const createResp = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${oauthToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: dateStr,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [CONFIG.driveFolderId],
-    }),
-  });
-  const createData = await createResp.json();
-  return createData.id;
-}
-
-async function uploadToDrive(b64, mime, filename) {
-  // Get or create today's date folder
-  const today = new Date().toISOString().slice(0, 10);
-  const folderId = await getOrCreateDateFolder(today);
-
-  const bnd = 'wh_bnd';
-  const meta = JSON.stringify({ name: filename, parents: [folderId] });
-  const body = `--${bnd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${bnd}\r\nContent-Type: ${mime}\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n--${bnd}--`;
-  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
-    method:'POST',
-    headers:{ Authorization:`Bearer ${oauthToken}`, 'Content-Type':`multipart/related; boundary=${bnd}` },
-    body,
-  });
-  return await r.json();
-}
-
-async function appendToSheet(token, row) {
+async function appendToSheet(row) {
+  const token = await getServiceAccountToken();
   await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.sheetId}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED`, {
     method:'POST',
     headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
@@ -373,7 +450,6 @@ document.getElementById('log-btn').addEventListener('click', async () => {
   resetAll();
   showToast(`${finalCount} piece${finalCount !== 1 ? 's' : ''} logged!`);
 
-  // Progress UI
   progressWrap.style.display = 'block';
   progressFill.style.width = '0';
   let w = 0;
@@ -382,20 +458,17 @@ document.getElementById('log-btn').addEventListener('click', async () => {
   try {
     let photoLink = '';
 
-    // Upload photo using OAuth (real Google account = real storage quota)
-    if (oauthToken && snapB64) {
+    if (snapB64) {
       progressLabel.textContent = 'Uploading photo to Drive...';
       const now = new Date();
       const filename = `PKG_${now.toISOString().slice(0,10)}_${now.toTimeString().slice(0,8).replace(/:/g,'')}.jpg`;
       const driveFile = await uploadToDrive(snapB64, snapMime, filename);
-      photoLink = driveFile.webViewLink || '';
+      photoLink = driveFile?.webViewLink || '';
     }
 
-    // Log to Sheets using service account
     if (sheetsConfigured) {
       progressLabel.textContent = 'Saving to Sheets...';
-      const saToken = await getServiceAccountToken();
-      await appendToSheet(saToken, [dateStr, finalCount, name, notes, photoLink]);
+      await appendToSheet([dateStr, finalCount, name, notes, photoLink]);
     }
 
     clearInterval(tick);
@@ -404,10 +477,10 @@ document.getElementById('log-btn').addEventListener('click', async () => {
     setTimeout(() => { progressWrap.style.display = 'none'; progressFill.style.width = '0'; }, 1000);
     setStatus(id, 'saved');
 
-  } catch(e) {
+  } catch(err) {
     clearInterval(tick);
     progressWrap.style.display = 'none';
-    console.error(e);
+    console.error(err);
     setStatus(id, 'error');
   }
 });
